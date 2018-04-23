@@ -1,0 +1,244 @@
+!--- Individual Project – Cisco Access Control Lists
+!--- by Barth O'Keeffe
+!--- 14180847
+
+remark commands to create a named acl
+
+!---  enable 
+!--- configure terminal 
+!--- ip access-list extended (access-list name)
+
+remark first create a named acl for border router FastEthernet 0/0
+
+!--- ip access-list extended borderFastEthernet00
+
+remark block imcomming traffic from evil-subnet
+deny ip 166.60.0.0 0.0.255.255 any
+
+remark ingress filtering
+deny ip 136.201.0.0 0.0.255.255 any
+deny ip 192.168.0.0 0.0.255.255 any
+deny ip 10.0.0.0 0.255.255.255 any
+deny ip host 127.0.0.1  any
+
+remark allow SMPT
+permit tcp any host 136.201.1.10 eq 25
+
+remark DataBase Server (136.201.20.100) access for business partner (20.0.0.0/8) 
+!--- using MSSQL queries (TCP/1433)
+permit tcp 20.0.0.0 0.255.255.255 host 136.201.20.100 eq 1433 reflect dbtraffic
+
+remark allow connections to partner’s DNS server 20.1.1.1 for DNS queries (TCP/53 and UDP/53). 
+permit tcp host 20.1.1.1  136.201.40.0 0.0.0.255 eq 53
+permit udp host 20.1.1.1  136.201.40.0 0.0.0.255 eq 53
+
+remark allow incomming HTTP traffic at ports greater than 1023 on webserver
+permit tcp host 136.201.1.20 gt 1023 any eq 80 reflect httptraffic
+
+remark allow incomming HTTPS traffic at ports greater than 1023 on webserver
+permit tcp host 136.201.1.20 gt 1023 any eq 443 reflect httpstraffic
+
+
+remark allow incomming HTTP traffic at ports greater than 1023
+permit tcp any gt 1023 any eq 80 
+
+remark allow incomming HTTPS traffic at ports greater than 1023
+permit tcp any gt 1023 any eq 443 
+
+remark allow rip
+permit udp any any eq 520
+
+
+remark allow ping replys
+permit icmp any any echo-reply
+
+remark deny incoming ping requests
+deny icmp any any 
+
+remark block all other traffic
+deny ip any any
+
+!---  exit
+
+remark next apply policy to FastEthernet 1/0 
+
+!--- int FastEthernet0/0
+!--- ip access-group borderFastEthernet00 in
+
+
+!------------------- !----------------------------- !---------------------------------
+!---  second acl for FastEthernet1/0
+!------------------- !----------------------------- !---------------------------------
+
+!--- ip access-list extended borderFastEthernet01
+
+remark block traffic to evil-subnet
+deny ip 166.60.0.0 0.0.255.255 any
+
+remark engress filtering
+deny ip 192.168.0.0 0.0.255.255 any
+deny ip host 127.0.0.1  any
+
+remark allow SMPT repleys
+permit tcp host 136.201.1.10 eq 25 any 
+
+remark DataBase Server (136.201.20.100) replies to business partner (20.0.0.0/8) 
+!--- using MSSQL queries (TCP/1433)
+evaluate dbtraffic
+permit tcp host 136.201.20.100 eq 1433 20.0.0.0 0.255.255.255
+
+remark allow connections to partner’s DNS server 20.1.1.1 for DNS queries (TCP/53 and UDP/53). 
+permit tcp 136.201.40.0 0.0.0.255 eq 53 host 20.1.1.1 
+permit udp 136.201.40.0 0.0.0.255 eq 53 host 20.1.1.1 
+
+remark allow outgoing HTTP traffic to ports greater than 1023
+evaluate httptraffic
+permit tcp any eq 80 any gt 1023
+remark allow outgoing HTTPS traffic to ports greater than 1023
+evaluate httpstraffic
+permit tcp any eq 443 any gt 1023 
+
+remark allow rip
+permit udp any any eq 520
+
+remark allow ICMP 
+permit icmp any any
+
+remark block all other traffic
+deny ip any any
+!--- int FastEthernet1/0
+!--- ip access-group borderFastEthernet10 in
+
+
+!------------------- !----------------------------- !---------------------------------
+!---  ACLS for Internal Router
+!------------------- !----------------------------- !---------------------------------
+
+!------------------- !----------------------------- !---------------------------------
+!---  ACL for  FastEthernet 0/0 Internal Router
+!------------------- !----------------------------- !---------------------------------
+remark Public Network, IP address 136.201.1.2
+
+remark first create a named acl for interal router FastEthernet 0/0
+
+!--- ip access-list extended interalFastEthernet00
+evaluate DNS_tcptraffic
+evaluate DNS_udptraffic
+evaluate mailrelaytraffic
+
+remark allow incomming HTTPS traffic at ports greater than 1023
+permit tcp any gt 1023 any eq 443 reflect httpstraffic
+
+remark allow connections to partner’s DNS server 20.1.1.1 for DNS queries (TCP/53 and UDP/53). 
+permit tcp host 20.1.1.1  136.201.40.0 0.0.0.255 eq 53 
+permit udp host 20.1.1.1  136.201.40.0 0.0.0.255 eq 53 
+
+remark DataBase Server (136.201.20.100) access for business partner (20.0.0.0/8) 
+!--- using MSSQL queries (TCP/1433)
+permit tcp 20.0.0.0 0.255.255.255 host 136.201.20.100 eq 1433 reflect parnter_dbtraffic
+
+remark allow puplic webserver access database
+permit tcp host 136.201.1.20 host 136.201.20.100 eq 1433 reflect pub_web_debtraffic
+
+remark allow mail server access mail relay server
+permit tcp host 136.201.1.10 eq 25 host 136.201.20.50 eq 25 
+
+remark allow rip
+permit udp any any eq 520
+
+remark allow ICMP
+permit icmp any any
+
+
+deny any any
+!------------------- !----------------------------- !---------------------------------
+!---  ACL for  FastEthernet 1/0 Internal Router
+!------------------- !----------------------------- !---------------------------------
+remark Server Network, IP address 136.201.20.1
+
+remark first create a named acl for interal router FastEthernet 1/0
+
+!--- ip access-list extended interalFastEthernet10
+evaluate Imaptraffic
+evaluate smpttraffic
+evaluate dbtraffic
+evaluate parnter_dbtraffic
+evaluate pub_web_debtraffic
+remark allow incomming HTTPS traffic at ports greater than 1023
+
+permit tcp any gt 1023 any eq 443 
+
+remark DataBase Server (136.201.20.100) reply to workstations
+!--- using MSSQL queries (TCP/1433)
+permit tcp host 136.201.20.100 eq 1433  136.201.40.0 0.0.0.255 
+
+remark Mail server (136.201.20.50) access for IMAP and SMTP for wprkstations
+permit tcp host 136.201.20.50 eq 25 136.201.40.0 0.0.0.255  remark SMTP
+permit tcp host 136.201.20.50 eq 143 136.201.40.0 0.0.0.255  remark IMAP
+
+remark DataBase Server (136.201.20.100) replies to business partner (20.0.0.0/8) 
+!--- using MSSQL queries (TCP/1433)
+permit tcp host 136.201.20.100 eq 1433 20.0.0.0 0.255.255.255 
+
+remark allow database reply to puplic webserver 
+permit tcp host 136.201.20.100 eq 1433 host 136.201.1.20  
+
+
+remark permit replies from mail server to workstations
+permit tcp host 136.201.20.50 eq 143 136.201.40.0 0.0.0.255 eq 143 
+
+remark allow rip
+permit udp any any eq 520
+remark allow ICMP
+permit icmp any any
+
+deny any any
+
+!------------------- !----------------------------- !---------------------------------
+!---  ACL for  FastEthernet 2/0 Internal Router
+!------------------- !----------------------------- !---------------------------------
+remark Workstation Network, IP address 136.201.40.1
+
+remark first create a named acl for interal router FastEthernet 2/0
+
+!--- ip access-list extended interalFastEthernet20
+remark allow internal pcs access public web server
+permit tcp 136.201.40.1 0.0.0.63 host 136.201.3.30 eq 443 reflect httpstraffic
+
+remark deny access to https for internal pcs.
+deny tcp 136.201.40.1 0.0.0.63 any eq 443 
+
+remark allow incomming HTTPS traffic at ports greater than 1023
+permit tcp any gt 1023 any eq 443 reflect other_httpstraffic
+
+remark DataBase Server (136.201.20.100) access for workstations
+!--- using MSSQL queries (TCP/1433)
+permit tcp any host 136.201.20.100 eq 1433 reflect dbtraffic
+
+remark Mail server (136.201.20.50) access for IMAP and SMTP for wprkstations
+permit tcp any host 136.201.20.50 eq 25 reflect smpttraffic remark SMTP
+permit tcp any host 136.201.20.50 eq 143 reflect Iamptraffic remark IMAP
+
+remark deny connections to partner’s DNS server 20.1.1.1 for DNS queries (TCP/53 and UDP/53). 
+!--- for internal pcs
+deny tcp host 20.1.1.1  136.201.40.0 0.0.0.63 eq 53 
+deny udp host 20.1.1.1  136.201.40.0 0.0.0.63 eq 53 
+
+remark allow connections to partner’s DNS server 20.1.1.1 for DNS queries (TCP/53 and UDP/53). 
+permit tcp host 20.1.1.1  136.201.40.0 0.0.0.255 eq 53 reflect DNS_tcptraffic
+permit udp host 20.1.1.1  136.201.40.0 0.0.0.255 eq 53 reflect DNS_udptraffic
+
+remark allow mail server access mail relay server
+permit tcp host 136.201.20.50 eq 25 host 136.201.1.10 eq 25 reflect mailrelaytraffic
+
+remark deny access to mail server for internal pcs
+deny tcp 136.201.40.0 0.0.0.63 eq 143 host 136.201.20.50 eq 143
+
+remark permit access to mail server for workstations
+permit tcp any eq 143 host 136.201.20.50 eq 143
+remark allow rip
+permit udp any any eq 520
+
+remark allow ICMP 
+permit icmp any any
+deny any any

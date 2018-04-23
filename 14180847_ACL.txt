@@ -1,0 +1,262 @@
+001: !--- Individual Project – Cisco Access Control Lists
+002: !--- by Barth O'Keeffe
+003: !--- 14180847
+004:
+005: remark commands to create a named acl
+006:
+007: !---  enable
+008: !--- configure terminal
+009: !--- ip access-list extended (access-list name)
+010:
+011: remark first create a named acl for border router FastEthernet 0/0
+012:
+013: !--- ip access-list extended borderFastEthernet00
+014:
+015: remark block imcomming traffic from evil-subnet
+016: deny ip 166.60.0.0 0.0.255.255 any
+017:
+018: remark ingress filtering
+019: deny ip 136.201.0.0 0.0.255.255 any
+020: deny ip 192.168.0.0 0.0.255.255 any
+021: deny ip 10.0.0.0 0.255.255.255 any
+022: deny ip host 127.0.0.1  any
+023:
+024: remark allow SMPT
+025: permit tcp any host 136.201.1.10 eq 25
+026:
+027: remark DataBase Server (136.201.20.100) access for business partner (20.0.0.0/8)
+028: !--- using MSSQL queries (TCP/1433)
+029: permit tcp 20.0.0.0 0.255.255.255 host 136.201.20.100 eq 1433 reflect dbtraffic
+030:
+031: remark allow connections to partner’s DNS server 20.1.1.1 for DNS queries (TCP/53 and UDP/53).
+032: permit tcp host 20.1.1.1  136.201.40.0 0.0.0.255 eq 53
+033: permit udp host 20.1.1.1  136.201.40.0 0.0.0.255 eq 53
+034:
+035: remark allow incomming HTTP traffic at ports greater than 1023 on webserver
+036: permit tcp host 136.201.1.20 gt 1023 any eq 80 reflect httptraffic
+037:
+038: remark allow incomming HTTPS traffic at ports greater than 1023 on webserver
+039: permit tcp host 136.201.1.20 gt 1023 any eq 443 reflect httpstraffic
+040:
+041:
+042: remark allow incomming HTTP traffic at ports greater than 1023
+043: permit tcp any gt 1023 any eq 80
+044:
+045: remark allow incomming HTTPS traffic at ports greater than 1023
+046: permit tcp any gt 1023 any eq 443
+047:
+048: remark allow rip
+049: permit udp any any eq 520
+050:
+051:
+052: remark allow ping replys
+053: permit icmp any any echo-reply
+054:
+055: remark deny incoming ping requests
+056: deny icmp any any
+057:
+058: remark block all other traffic
+059: deny ip any any
+060:
+061: !---  exit
+062:
+063: remark next apply policy to FastEthernet 0/0
+064:
+065: !--- int FastEthernet0/0
+066: !--- ip access-group borderFastEthernet00 in
+067:
+068:
+069: !------------------- !----------------------------- !---------------------------------
+070: !---  second acl for FastEthernet1/0
+071: !------------------- !----------------------------- !---------------------------------
+072:
+073: !--- ip access-list extended borderFastEthernet01
+074:
+075: remark block traffic to evil-subnet
+076: deny ip 166.60.0.0 0.0.255.255 any
+077:
+078: remark engress filtering
+079: deny ip 192.168.0.0 0.0.255.255 any
+080: deny ip host 127.0.0.1  any
+081:
+082: remark allow SMPT repleys
+083: permit tcp host 136.201.1.10 eq 25 any
+084:
+085: remark DataBase Server (136.201.20.100) replies to business partner (20.0.0.0/8)
+086: !--- using MSSQL queries (TCP/1433)
+087: evaluate dbtraffic
+088: permit tcp host 136.201.20.100 eq 1433 20.0.0.0 0.255.255.255
+089:
+090: remark allow connections to partner’s DNS server 20.1.1.1 for DNS queries (TCP/53 and UDP/53).
+091: permit tcp 136.201.40.0 0.0.0.255 eq 53 host 20.1.1.1
+092: permit udp 136.201.40.0 0.0.0.255 eq 53 host 20.1.1.1
+093:
+094: remark allow outgoing HTTP traffic to ports greater than 1023
+095: evaluate httptraffic
+096: permit tcp any eq 80 any gt 1023
+097: remark allow outgoing HTTPS traffic to ports greater than 1023
+098: evaluate httpstraffic
+099: permit tcp any eq 443 any gt 1023
+100:
+101: remark allow rip
+102: permit udp any any eq 520
+103:
+104: remark allow ICMP
+105: permit icmp any any
+106:
+107: remark block all other traffic
+108: deny ip any any
+109: !--- int FastEthernet1/0
+110: !--- ip access-group borderFastEthernet10 in
+111:
+112:
+113: !------------------- !----------------------------- !---------------------------------
+114: !---  ACLS for Internal Router
+115: !------------------- !----------------------------- !---------------------------------
+116:
+117: !------------------- !----------------------------- !---------------------------------
+118: !---  ACL for  FastEthernet 0/0 Internal Router
+119: !------------------- !----------------------------- !---------------------------------
+120: remark Public Network, IP address 136.201.1.2
+121:
+122: remark first create a named acl for interal router FastEthernet 0/0
+123:
+124: !--- ip access-list extended interalFastEthernet00
+125: evaluate DNS_tcptraffic
+126: evaluate DNS_udptraffic
+127: evaluate mailrelaytraffic
+128:
+129: remark allow incomming HTTPS traffic at ports greater than 1023
+130: permit tcp any gt 1023 any eq 443 reflect httpstraffic
+131:
+132: remark allow connections to partner’s DNS server 20.1.1.1 for DNS queries (TCP/53 and UDP/53).
+133: permit tcp host 20.1.1.1  136.201.40.0 0.0.0.255 eq 53
+134: permit udp host 20.1.1.1  136.201.40.0 0.0.0.255 eq 53
+135:
+136: remark DataBase Server (136.201.20.100) access for business partner (20.0.0.0/8)
+137: !--- using MSSQL queries (TCP/1433)
+138: permit tcp 20.0.0.0 0.255.255.255 host 136.201.20.100 eq 1433 reflect parnter_dbtraffic
+139:
+140: remark allow puplic webserver access database
+141: permit tcp host 136.201.1.20 host 136.201.20.100 eq 1433 reflect pub_web_debtraffic
+142:
+143: remark allow mail server access mail relay server
+144: permit tcp host 136.201.1.10 eq 25 host 136.201.20.50 eq 25
+145:
+146: remark allow rip
+147: permit udp any any eq 520
+148:
+149: remark allow ICMP
+150: permit icmp any any
+151:
+152:
+153: deny any any
+154: !------------------- !----------------------------- !---------------------------------
+155: !---  ACL for  FastEthernet 1/0 Internal Router
+156: !------------------- !----------------------------- !---------------------------------
+157: remark Server Network, IP address 136.201.20.1
+158:
+159: remark first create a named acl for interal router FastEthernet 1/0
+160:
+161: !--- ip access-list extended interalFastEthernet10
+162: evaluate Imaptraffic
+163: evaluate smpttraffic
+164: evaluate dbtraffic
+165: evaluate parnter_dbtraffic
+166: evaluate pub_web_debtraffic
+167: remark allow incomming HTTPS traffic at ports greater than 1023
+168:
+169: permit tcp any gt 1023 any eq 443
+170:
+171: remark DataBase Server (136.201.20.100) reply to workstations
+172: !--- using MSSQL queries (TCP/1433)
+173: permit tcp host 136.201.20.100 eq 1433  136.201.40.0 0.0.0.255
+174:
+175: remark Mail server (136.201.20.50) access for IMAP and SMTP for wprkstations
+176: permit tcp host 136.201.20.50 eq 25 136.201.40.0 0.0.0.255  remark SMTP
+177: permit tcp host 136.201.20.50 eq 143 136.201.40.0 0.0.0.255  remark IMAP
+178:
+179: remark DataBase Server (136.201.20.100) replies to business partner (20.0.0.0/8)
+180: !--- using MSSQL queries (TCP/1433)
+181: permit tcp host 136.201.20.100 eq 1433 20.0.0.0 0.255.255.255
+182:
+183: remark allow database reply to puplic webserver
+184: permit tcp host 136.201.20.100 eq 1433 host 136.201.1.20
+185:
+186:
+187: remark permit replies from mail server to workstations
+188: permit tcp host 136.201.20.50 eq 143 136.201.40.0 0.0.0.255 eq 143
+189:
+190: remark allow rip
+191: permit udp any any eq 520
+192: remark allow ICMP
+193: permit icmp any any
+194:
+195: deny any any
+196:
+197: !------------------- !----------------------------- !---------------------------------
+198: !---  ACL for  FastEthernet 2/0 Internal Router
+199: !------------------- !----------------------------- !---------------------------------
+200: remark Workstation Network, IP address 136.201.40.1
+201:
+202: remark first create a named acl for interal router FastEthernet 2/0
+203:
+204: !--- ip access-list extended interalFastEthernet20
+205: remark allow internal pcs access public web server
+206: permit tcp 136.201.40.1 0.0.0.63 host 136.201.3.30 eq 443 reflect httpstraffic
+207:
+208: remark deny access to https for internal pcs.
+209: deny tcp 136.201.40.1 0.0.0.63 any eq 443
+210:
+211: remark allow incomming HTTPS traffic at ports greater than 1023
+212: permit tcp any gt 1023 any eq 443 reflect other_httpstraffic
+213:
+214: remark DataBase Server (136.201.20.100) access for workstations
+215: !--- using MSSQL queries (TCP/1433)
+216: permit tcp any host 136.201.20.100 eq 1433 reflect dbtraffic
+217:
+218: remark Mail server (136.201.20.50) access for IMAP and SMTP for wprkstations
+219: permit tcp any host 136.201.20.50 eq 25 reflect smpttraffic remark SMTP
+220: permit tcp any host 136.201.20.50 eq 143 reflect Iamptraffic remark IMAP
+221:
+222: remark deny connections to partner’s DNS server 20.1.1.1 for DNS queries (TCP/53 and UDP/53).
+223: !--- for internal pcs
+224: deny tcp host 20.1.1.1  136.201.40.0 0.0.0.63 eq 53
+225: deny udp host 20.1.1.1  136.201.40.0 0.0.0.63 eq 53
+226:
+227: remark allow connections to partner’s DNS server 20.1.1.1 for DNS queries (TCP/53 and UDP/53).
+228: permit tcp host 20.1.1.1  136.201.40.0 0.0.0.255 eq 53 reflect DNS_tcptraffic
+229: permit udp host 20.1.1.1  136.201.40.0 0.0.0.255 eq 53 reflect DNS_udptraffic
+230:
+231: remark allow mail server access mail relay server
+232: permit tcp host 136.201.20.50 eq 25 host 136.201.1.10 eq 25 reflect mailrelaytraffic
+233:
+234: remark deny access to mail server for internal pcs
+235: deny tcp 136.201.40.0 0.0.0.63 eq 143 host 136.201.20.50 eq 143
+236:
+237: remark permit access to mail server for workstations
+238: permit tcp any eq 143 host 136.201.20.50 eq 143
+239: remark allow rip
+240: permit udp any any eq 520
+241:
+242: remark allow ICMP
+243: permit icmp any any
+244: deny any any
+
+
+!---------------------------------------------------------------!--------------
+remark         Explation of ICMP policy
+!---------------------------------------------------------------!--------------
+!--- first Ping replys were permited on border router FastEthernet 0/0
+!--- line 053: permit icmp any any echo-reply
+!--- all other icmp traffic is blocked
+!--- line 059: deny ip any any
+!--- icmp is fully enabled on all other router interfaces
+!--- this mean ping requests are blocked from entering the Network
+!--- but ping is fully functional within the Network
+!--- Also ping requests are allowed to leave the Network and replys are allowed back in.
+
+!---------------------------------------------------------------!--------------
+remark         Router Protocol
+!---------------------------------------------------------------!--------------
+!--- all interfaces are configured to use rip
